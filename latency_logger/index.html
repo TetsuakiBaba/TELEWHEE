@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bootstrap demo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <title>WebRTC Delay Measurement</title>
+    <style>
+        video,
+        canvas {
+            display: block;
+            margin: 10px 0;
+        }
+    </style>
+    <!-- v5 -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+</head>
+
+<body>
+    <div class="container-sm">
+
+        <h1 class="display-4 mt-4 pt-4">WebRTC Delay Measurement</h1>
+        <div class="alert alert-secondary alert-dismissible fade show mt-3" role="alert">
+            <strong>計測方法</strong>
+            タイムスタンプを描画するキャンバスをWebRTCを利用して動画として送信し，同じウィンドウ内で受信します．タイムスタンプ描画と受信ビデオの値をOCR処理して，送信と受信の遅延を計測します．計測Startボタンを押すと計測を開始します．計測をやり直す場合はリロードしてください．
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                プレビュー
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-4">
+                        <strong>タイムスタンプ描画</strong>
+                        <canvas class="img-fluid" id="sendCanvas"></canvas>
+                    </div>
+                    <div class="col-4">
+                        <strong>送信ビデオ</strong>
+                        <video class="img-fluid" id="sendVideo" autoplay playsinline controls></video>
+                    </div>
+                    <div class="col-4">
+                        <strong>受信ビデオ</strong> <span class="badge bg-dark" id="resolution_recv"></span>
+                        <video class="img-fluid" id="remoteVideo" autoplay playsinline controls></video>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="col-6">
+                <div class="card">
+                    <div class="card-header">
+                        解像度設定 <span class="badge text-bg-dark" id="resolution"></span>
+                    </div>
+                    <div class=" card-body">
+                        <button class="btn btn-outline-secondary" onclick="setResolution(3840, 2160)">3840x2160</button>
+                        <button class="btn btn-outline-secondary" onclick="setResolution(2560, 1440)">2560x1440</button>
+                        <button class="btn btn-outline-secondary" onclick="setResolution(1920, 1080)">1920x1080</button>
+                        <button class="btn btn-outline-secondary" onclick="setResolution(1280, 720)">1280x720</button>
+                        <button class="btn btn-outline-secondary" onclick="setResolution(640, 480)">640x480</button>
+                        <button class="btn btn-outline-secondary" onclick="setResolution(320, 240)">320x240</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card">
+                    <div class="card-header">
+                        フレームレート設定 <span class="badge text-bg-dark" id="framerate"></span>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-outline-secondary" onclick="setFrameRate(5)">5 FPS</button>
+                        <button class="btn btn-outline-secondary" onclick="setFrameRate(10)">10 FPS</button>
+                        <button class="btn btn-outline-secondary" onclick="setFrameRate(15)">15 FPS</button>
+                        <button class="btn btn-outline-secondary" onclick="setFrameRate(30)">30 FPS</button>
+                        <button class="btn btn-outline-secondary" onclick="setFrameRate(60)">60 FPS</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <button class="btn btn-danger mt-2 mb-2" id="startButton">
+                    計測 Start
+                </button>
+                <hr>
+                <textarea class="form-control" placeholder="ここに計測ログがCSV形式で出力されます" id="log" rows="3" readonly></textarea>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button class="btn btn-success mb-2" onclick="exportCSV();">
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <script>
+        const sendCanvas = document.getElementById('sendCanvas');
+        const sendCtx = sendCanvas.getContext('2d');
+        const sendVideo = document.getElementById('sendVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const ocrCanvas = document.createElement('canvas');
+        const ocrCtx = ocrCanvas.getContext('2d');
+        ocrCanvas.width = 160 * 2; // OCRキャンバスの固定サイズ
+        ocrCanvas.height = 120 * 2; // OCRキャンバスの固定サイズ
+
+        let frameRate = 60; // 初期フレームレート
+        let resolution = { width: 640, height: 480 }; // 初期解像度
+        let resolution_recv = { width: 0, height: 0 }; // 受信解像度
+        let previousWidth = 0;
+        let previousHeight = 0;
+        let drawInterval;
+        let stream;
+        let localPeer;
+        let remotePeer;
+
+        document.querySelector('#resolution').textContent = `${resolution.width}x${resolution.height}`;
+        document.querySelector('#framerate').textContent = `${frameRate} FPS`;
+
+
+        async function startWebRTC() {
+            sendCanvas.width = resolution.width;
+            sendCanvas.height = resolution.height;
+            stream = sendCanvas.captureStream(frameRate); // 初期フレームレートでのストリーム
+
+            // 送信ビデオのソースを設定
+            sendVideo.srcObject = stream;
+
+            localPeer = new RTCPeerConnection();
+            remotePeer = new RTCPeerConnection();
+
+            stream.getTracks().forEach(track => localPeer.addTrack(track, stream));
+
+
+            localPeer.onicecandidate = event => {
+                if (event.candidate) {
+                    remotePeer.addIceCandidate(event.candidate);
+                }
+            };
+
+            remotePeer.onicecandidate = event => {
+                if (event.candidate) {
+                    localPeer.addIceCandidate(event.candidate);
+                }
+            };
+
+            remotePeer.ontrack = event => {
+                remoteVideo.srcObject = event.streams[0];
+                checkVideoSizeChange(); // 初期チェック
+            };
+
+            const offer = await localPeer.createOffer();
+            await localPeer.setLocalDescription(offer);
+            await remotePeer.setRemoteDescription(offer);
+
+            const answer = await remotePeer.createAnswer();
+            await remotePeer.setLocalDescription(answer);
+            await localPeer.setRemoteDescription(answer);
+
+            drawInterval = setInterval(drawTimestamp, 1000 / frameRate); // 初期フレームレートでのタイムスタンプ描画
+        }
+
+        function drawTimestamp() {
+            sendCtx.clearRect(0, 0, sendCanvas.width, sendCanvas.height);
+            sendCtx.fillStyle = 'black';
+            sendCtx.fillRect(0, 0, sendCanvas.width, sendCanvas.height);
+
+            // タイムスタンプをミリ秒単位で描画
+            const timestamp = new Date().getTime();
+            sendCtx.font = `${sendCanvas.width / 8}px Arial`;
+            sendCtx.fillStyle = 'white';
+            sendCtx.fillText(timestamp, sendCanvas.width * 0.04, sendCanvas.height / 1.8);
+
+            // フレームを強制的に送信
+            // const tracks = stream.getVideoTracks();
+            const tracks = sendVideo.srcObject.getVideoTracks();
+            if (tracks.length > 0) {
+                tracks[0].requestFrame();
+            }
+        }
+
+        function setResolution(width, height) {
+            resolution.width = width;
+            resolution.height = height;
+            sendCanvas.width = width;
+            sendCanvas.height = height;
+            document.querySelector('#resolution').textContent = `${width}x${height}`;
+        }
+
+        function setFrameRate(newRate) {
+            frameRate = newRate;
+            clearInterval(drawInterval);
+
+            // もし既にtrackがあればフレームレートを変更
+            if (stream) {
+                stream.getTracks().forEach(track => track.applyConstraints({ frameRate: frameRate }));
+                drawInterval = setInterval(drawTimestamp, 1000 / frameRate);
+            }
+
+            document.querySelector('#framerate').textContent = `${frameRate} FPS`;
+        }
+
+        function checkVideoSizeChange() {
+            setInterval(() => {
+                const currentWidth = remoteVideo.videoWidth;
+                const currentHeight = remoteVideo.videoHeight;
+                if (currentWidth !== previousWidth || currentHeight !== previousHeight) {
+                    previousWidth = currentWidth;
+                    previousHeight = currentHeight;
+                    onRemoteVideoResize(currentWidth, currentHeight);
+                }
+            }, 500); // 0.5秒ごとにチェック
+        }
+        function onRemoteVideoResize(newWidth, newHeight) {
+            console.log(`Remote video resized to: ${newWidth}x${newHeight}`);
+            resolution_recv.width = newWidth;
+            resolution_recv.height = newHeight;
+            document.querySelector('#resolution_recv').textContent = `${newWidth}x${newHeight}`;
+            // ここに解像度が変更されたときの処理を記述
+        }
+        async function exportCSV() {
+            const log = document.getElementById('log').value;
+            const blob = new Blob([log], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'delay_log.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        async function measureDelay() {
+            let count = 0;
+            setInterval(async () => {
+                // ストリームを一時停止
+                // stream.getTracks().forEach(track => track.enabled = false);
+                sendVideo.pause();
+                remoteVideo.pause();
+
+                const sendTimestamp = await captureSendTimestamp();
+                const receiveTimestamp = await captureReceiveTimestamp();
+
+                if (sendTimestamp && receiveTimestamp) {
+                    count++;
+                    const delay = sendTimestamp - receiveTimestamp;
+                    const log = `${count},${delay},${sendTimestamp},${receiveTimestamp},${resolution_recv.width}x${resolution_recv.height}\n`;
+                    document.getElementById('log').value += log;
+                    // log textareaを最下部にスクロール
+                    document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+                    console.log(`Delay: ${delay} ms`);
+                }
+
+                // ストリームを再開
+                // stream.getTracks().forEach(track => track.enabled = true);
+                sendVideo.play();
+                remoteVideo.play();
+            }, 3000); // 1秒ごとに計測
+        }
+
+        async function captureSendTimestamp() {
+            if (sendVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                ocrCtx.drawImage(sendVideo, 0, 0, ocrCanvas.width, ocrCanvas.height);
+                const timestampText = await extractTimestampFromCanvas(ocrCanvas);
+                return parseInt(timestampText, 10);
+            }
+            return null;
+            // const dataUrl = sendCanvas.toDataURL();
+            // const img = new Image();
+            // img.src = dataUrl;
+            // return new Promise((resolve) => {
+            //     img.onload = async () => {
+            //         ocrCtx.drawImage(img, 0, 0, ocrCanvas.width, ocrCanvas.height);
+            //         const timestampText = await extractTimestampFromCanvas(ocrCanvas);
+            //         resolve(parseInt(timestampText, 10));
+            //     };
+            // });
+        }
+
+        async function captureReceiveTimestamp() {
+            if (remoteVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                ocrCtx.drawImage(remoteVideo, 0, 0, ocrCanvas.width, ocrCanvas.height);
+                const timestampText = await extractTimestampFromCanvas(ocrCanvas);
+                return parseInt(timestampText, 10);
+            }
+            return null;
+        }
+
+        async function extractTimestampFromCanvas(canvas) {
+            const { data: { text } } = await Tesseract.recognize(canvas, 'eng', {
+                // logger: m => console.log(m),
+                tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE
+            });
+            return text.trim();
+        }
+
+        document.getElementById('startButton').addEventListener('click', () => {
+            this.disabled = true;
+            startWebRTC();
+            measureDelay();
+        });
+
+
+    </script>
+</body>
+
+</html>
