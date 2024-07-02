@@ -4,12 +4,19 @@
 
 
 ![](./screenshot.png)
-WebRTCでブラウザ間で高画質画像と音声を送信しながら遠隔地からwheeを操作する実験的プロジェクト。本リポジトリは東京都立大学5Gプロジェクトのの一貫で作成されました。
+多くのユーザが利用できるよう，なるべくコストをかけずにWebRTCでブラウザ間で高画質画像と音声を送信しながら遠隔地から電動車いすwhillを操作する実験的プロジェクト。本リポジトリは東京都立大学5Gプロジェクトのの一貫で作成されました。
 
 ## Getting Started
-1. npmでライブラリをインストール
+1. cloneとnpmでライブラリをインストール
 ```bash
+git clone https://github.com/TetsuakiBaba/TELEWHEE.git
+cd TELEWHEE
 npm install
+```
+2. サーバを起動
+```bash
+cd app
+node server.js
 ```
 3. ブラウザで https://[ip address]:1337 にアクセス
 4. 証明書が不正との警告がでるので、ブラウザ画面を選択した状態で、thisisunsafe とキーボード入力することでアクセスできる。ここがちょっと分かりづらいですが、単純に該当するブラウザウィンドウを選択している状態で、「thisisunsafe」とキーボードで打ち込んでください。RTC接続ではhttpsが必須なので、ローカル環境でhttpsが実行できるようにこのような作業が必要です。

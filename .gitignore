@@ -1,0 +1,10 @@
+node_modules/
+package.json
+package-lock.json
+yarn.lock
+.DS_Store
+AAC025/
+node_modules/
+実験動画/
+*.pem
+app/
