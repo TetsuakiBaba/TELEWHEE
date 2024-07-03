@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 
 
 def plot_data(csv_files):
-    plt.figure(figsize=(15, 3))
+    # plt.figure(figsize=(15, 3))
+    plt.figure(figsize=(10, 6))
 
     for csv_file in csv_files:
         # CSVファイルの読み込み
@@ -30,7 +31,7 @@ def plot_data(csv_files):
     plt.title('Latency log: 1920x1080@60fps')
     plt.legend()
     plt.grid(True)
-    plt.ylim(bottom=0, top=100)
+    plt.ylim(bottom=0, top=500)
 
     # グラフの表示
     plt.show()
