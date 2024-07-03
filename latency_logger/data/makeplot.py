@@ -16,14 +16,15 @@ def plot_data(csv_files):
         markersize = 5  # 点の大きさを設定
 
         # カウントとmsのデータをプロット
+        plot_name = csv_file.replace('.csv', '')
         plt.plot(df['カウント'], df['ms'], marker='o', linestyle='-',
-                 markersize=markersize, label=f'{csv_file} - Latency(ms)')
+                 markersize=markersize,  label=f'{plot_name}')
 
         # 特記事項があるプロットにラベルを表示（90度半時計回りで回転）
-        for i, row in df.iterrows():
-            if pd.notna(row['特記事項']):
-                plt.annotate(row['特記事項'], (row['カウント'], row['ms']),
-                             textcoords="offset points", xytext=(0, 10), ha='center', fontsize=9, color='red', rotation=90)
+        # for i, row in df.iterrows():
+        #     if pd.notna(row['特記事項']):
+        #         plt.annotate(row['特記事項'], (row['カウント'], row['ms']),
+        #                      textcoords="offset points", xytext=(0, 10), ha='center', fontsize=9, color='red', rotation=90)
 
     # グラフの設定
     plt.xlabel('count')
