@@ -181,8 +181,8 @@
                 sendCanvas.width = resolution.width;
                 sendCanvas.height = resolution.height;
                 stream = sendCanvas.captureStream(frameRate); // 初期フレームレートでのストリーム
-                drawInterval = setInterval(drawTimestamp, 1000 / frameRate); // 初期フレームレートでのタイムスタンプ描画
             }
+
 
             // 送信ビデオのソースを設定
             sendVideo.srcObject = stream;
@@ -377,7 +377,7 @@
         }
 
         async function toggleLogger(dom) {
-            if (sendVideo.srcObject) {
+            if (dom.textContent == '計測 Stop') {
                 dom.textContent = '計測 Start';
                 stopWebRTC();
             } else {
@@ -419,10 +419,10 @@
             }
 
             // 描画のインターバルをクリア
-            if (drawInterval) {
-                clearInterval(drawInterval);
-                drawInterval = null;
-            }
+            // if (drawInterval) {
+            //     clearInterval(drawInterval);
+            //     drawInterval = null;
+            // }
 
             // 動画要素のソースをクリア
             if (sendVideo.srcObject) {
@@ -435,7 +435,11 @@
             console.log('WebRTC connection stopped and resources released');
         }
 
-        window.onload = getCameraDevices;
+
+        window.onload = function () {
+            getCameraDevices();
+            drawInterval = setInterval(drawTimestamp, 1000 / frameRate);
+        };
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
