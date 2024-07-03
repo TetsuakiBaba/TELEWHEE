@@ -11,12 +11,11 @@
 1. cloneとnpmでライブラリをインストール
 ```bash
 git clone https://github.com/TetsuakiBaba/TELEWHEE.git
-cd TELEWHEE
+cd TELEWHEE/app
 npm install
 ```
 2. サーバを起動
 ```bash
-cd app
 node server.js
 ```
 3. ブラウザで https://[ip address]:1337 にアクセス
