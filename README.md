@@ -28,4 +28,5 @@ Render等のnode.jsが利用可能な外部サービスに本appをデプロイ�
 ## ファイル構成
 - `app/`: node.jsで動作するTELEWHEEアプリケーション本体
 - `latency_logger/`: WebRTCの最小遅延時間を計測するためのプログラム
+  - https://tetsuakibaba.github.io/TELEWHEE/latency_logger/
 - `arduino/whill_controller/`: whillの操作を行うためのプログラム
