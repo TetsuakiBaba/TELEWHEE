@@ -7,5 +7,5 @@ AAC025/
 node_modules/
 実験動画/
 *.pem
-app/
 *.ignore.*
+app/arduino/whill-sdk-arduino/
